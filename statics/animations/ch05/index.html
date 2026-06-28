@@ -2,25 +2,546 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Ch.05 — 강체 평형 & 지지 반력</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ch.05 — 강체의 평형 · 지지 반력</title>
 <link rel="stylesheet" href="../shared.css">
+<style>
+  .tab-bar { display:flex; gap:6px; margin-bottom:16px; flex-wrap:wrap; }
+  .tab-bar button { background:var(--border); font-size:13px; padding:7px 16px; border-radius:7px; }
+  .tab-bar button.active { background:var(--accent); }
+  #eq-panel {
+    background:#13161f; border-radius:10px; padding:14px 18px;
+    font-family:'Courier New',monospace; font-size:14px;
+    display:grid; grid-template-columns:1fr 1fr; gap:6px;
+    margin-top:14px;
+  }
+  .eq-line { padding:6px 0; border-bottom:1px solid #1e2236; }
+  .eq-line:last-child { border:none; }
+  .eq-label { color:var(--muted); font-size:12px; }
+  .eq-val   { color:var(--yellow); font-weight:700; font-size:14px; }
+  #stability-badge {
+    display:inline-flex; align-items:center; gap:8px;
+    padding:7px 16px; border-radius:20px; font-weight:700; font-size:14px;
+    margin-left:auto;
+  }
+  .stable   { background:#1a3a2a; color:#4fca7a; border:1px solid #4fca7a; }
+  .unstable { background:#3a1a1a; color:#f74f4f; border:1px solid #f74f4f; }
+  .indet    { background:#2a2a1a; color:#f7d44f; border:1px solid #f7d44f; }
+  .support-selector { display:flex; gap:8px; align-items:center; margin-bottom:10px; flex-wrap:wrap; }
+  .support-selector label { font-size:13px; color:var(--muted); }
+  .support-selector select {
+    background:var(--border); color:var(--text); border:1px solid #3a3f5c;
+    border-radius:7px; padding:5px 10px; font-size:13px; cursor:pointer;
+  }
+  .legend { display:flex; flex-wrap:wrap; gap:12px; margin-top:12px; font-size:12px; }
+  .legend-item { display:flex; align-items:center; gap:5px; }
+  .legend-dot  { width:12px; height:12px; border-radius:50%; }
+</style>
 </head>
 <body>
+
 <header>
   <span class="chapter-tag">CH 05</span>
-  <h1>강체 평형 & 지지 반력</h1>
+  <h1>Equilibrium of a Rigid Body — 강체의 평형 &amp; 지지 반력</h1>
 </header>
+
 <div class="container">
-  <div class="card" style="text-align:center;padding:60px;">
-    <p style="font-size:18px;color:#4f8ef7;">🚧 애니메이션 준비 중</p>
-    <p style="margin-top:12px;">핀·롤러·고정단 반력과 평형 방정식</p>
-    <p style="margin-top:20px;font-size:14px;color:#3a3f5c;">PDF 교과서를 업로드하면 이 챕터의 인터랙티브 애니메이션이 자동 생성됩니다.</p>
+
+  <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+    <div class="tab-bar" style="margin-bottom:0">
+      <button class="active" onclick="setTab('beam')">① 보 반력 계산</button>
+      <button onclick="setTab('support')">② 지지 조건 비교</button>
+      <button onclick="setTab('moment')">③ 복수 하중</button>
+    </div>
+    <span id="stability-badge" class="stable">정정 ✓</span>
   </div>
+
+  <div class="support-selector" id="support-sel-row">
+    <label>A 지점:</label>
+    <select id="selA" onchange="draw()">
+      <option value="pin" selected>핀 (Pin) — Ax, Ay</option>
+      <option value="roller">롤러 (Roller) — Ay</option>
+      <option value="fixed">고정단 (Fixed) — Ax, Ay, MA</option>
+    </select>
+    <label style="margin-left:12px">B 지점:</label>
+    <select id="selB" onchange="draw()">
+      <option value="roller" selected>롤러 (Roller) — By</option>
+      <option value="pin">핀 (Pin) — Bx, By</option>
+      <option value="free">자유단 (Free)</option>
+    </select>
+  </div>
+
+  <div class="card" style="padding:20px">
+    <canvas id="c" width="860" height="360"></canvas>
+
+    <div class="controls" style="margin-top:14px">
+      <label>하중 P: <span id="pv">120</span> N</label>
+      <input type="range" id="pmag" min="20" max="250" value="120">
+
+      <label>하중 위치 x: <span id="xv">40</span>%</label>
+      <input type="range" id="xpos" min="5" max="95" value="40">
+
+      <label id="lbl-p2" style="display:none">P₂: <span id="p2v">80</span> N</label>
+      <input type="range" id="p2mag" min="10" max="200" value="80" style="display:none">
+
+      <button onclick="toggleAnim()" id="btn-anim">▶ 하중 이동</button>
+      <button class="secondary" onclick="resetAll()">초기화</button>
+    </div>
+
+    <div id="eq-panel">
+      <div class="eq-line"><span class="eq-label">ΣFx = 0</span><br><span class="eq-val" id="eq-fx">—</span></div>
+      <div class="eq-line"><span class="eq-label">ΣFy = 0</span><br><span class="eq-val" id="eq-fy">—</span></div>
+      <div class="eq-line"><span class="eq-label">ΣM_A = 0</span><br><span class="eq-val" id="eq-ma">—</span></div>
+      <div class="eq-line"><span class="eq-label">반력 결과</span><br><span class="eq-val" id="eq-res">—</span></div>
+    </div>
+
+    <div class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:#4f8ef7"></div>외부 하중</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#4fca7a"></div>수직 반력</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f7834f"></div>수평 반력</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f7d44f"></div>모멘트 반력</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>강체 2D 평형 방정식</h2>
+    <div class="formula">ΣFx = 0  |  ΣFy = 0  |  ΣM_O = 0</div>
+    <p style="margin-top:10px">세 개의 독립 방정식 → <strong>최대 3개의 미지 반력</strong> 풀이 가능 (정정 조건).</p>
+    <table style="margin-top:14px">
+      <tr><th>지지 형태</th><th>반력 수</th><th>제공 반력</th></tr>
+      <tr><td>롤러 (Roller)</td><td>1</td><td>수직 N</td></tr>
+      <tr><td>핀 (Pin)</td><td>2</td><td>Ax, Ay</td></tr>
+      <tr><td>고정단 (Fixed)</td><td>3</td><td>Ax, Ay, MA</td></tr>
+    </table>
+  </div>
+
   <div class="nav-links card">
-    <a href="../../chapters/ch05-*/README.md">← 개념 노트</a>
+    <a href="../../chapters/ch05-equilibrium-rigid-body/">← 개념 노트</a>
     <a href="../../slides/ch05/">강의 슬라이드 →</a>
   </div>
+
 </div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+const CW = canvas.width, CH = canvas.height;
+
+let currentTab = 'beam';
+let animating  = false;
+let animT = 0.4, animDir = 1;
+
+/* ── helpers ── */
+function arrow(x1,y1,x2,y2,color,label,w,dashed){
+  w = w||2.5; dashed = dashed||false;
+  var dx=x2-x1,dy=y2-y1,len=Math.sqrt(dx*dx+dy*dy);
+  if(len<2)return;
+  ctx.save();
+  ctx.strokeStyle=color; ctx.lineWidth=w;
+  if(dashed) ctx.setLineDash([6,4]);
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  ctx.setLineDash([]);
+  var ang=Math.atan2(dy,dx),hs=12;
+  ctx.fillStyle=color;
+  ctx.beginPath();
+  ctx.moveTo(x2,y2);
+  ctx.lineTo(x2-hs*Math.cos(ang-0.4),y2-hs*Math.sin(ang-0.4));
+  ctx.lineTo(x2-hs*Math.cos(ang+0.4),y2-hs*Math.sin(ang+0.4));
+  ctx.closePath(); ctx.fill();
+  if(label){
+    ctx.fillStyle=color; ctx.font='bold 13px Segoe UI';
+    ctx.fillText(label,(x1+x2)/2+8,(y1+y2)/2-8);
+  }
+  ctx.restore();
+}
+
+function arcArrow(cx,cy,r,aStart,aEnd,color,ccw,label){
+  ctx.save();
+  ctx.strokeStyle=color; ctx.lineWidth=2.5;
+  ctx.beginPath(); ctx.arc(cx,cy,r,aStart,aEnd,ccw); ctx.stroke();
+  var aHead = ccw ? aEnd-0.25 : aEnd+0.25;
+  var tx=cx+r*Math.cos(aEnd), ty=cy+r*Math.sin(aEnd);
+  var hx=cx+r*Math.cos(aHead), hy=cy+r*Math.sin(aHead);
+  var ang=Math.atan2(ty-hy,tx-hx), hs=10;
+  ctx.fillStyle=color;
+  ctx.beginPath(); ctx.moveTo(tx,ty);
+  ctx.lineTo(tx-hs*Math.cos(ang-0.4),ty-hs*Math.sin(ang-0.4));
+  ctx.lineTo(tx-hs*Math.cos(ang+0.4),ty-hs*Math.sin(ang+0.4));
+  ctx.closePath(); ctx.fill();
+  if(label){ctx.fillStyle=color;ctx.font='bold 12px Segoe UI';ctx.fillText(label,cx-r-10,cy-r-8);}
+  ctx.restore();
+}
+
+function drawGrid(){
+  ctx.strokeStyle='#1a1e2e'; ctx.lineWidth=1;
+  for(var x=0;x<CW;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,CH);ctx.stroke();}
+  for(var y=0;y<CH;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(CW,y);ctx.stroke();}
+}
+
+function drawBeam(x0,y,len){
+  var grad=ctx.createLinearGradient(x0,y-10,x0,y+10);
+  grad.addColorStop(0,'#2e3560'); grad.addColorStop(1,'#1e2440');
+  ctx.fillStyle=grad;
+  ctx.beginPath(); ctx.roundRect(x0,y-10,len,20,4); ctx.fill();
+  ctx.strokeStyle='#4f5a8f'; ctx.lineWidth=1.5; ctx.stroke();
+}
+
+function drawPin(x,y,col){
+  col=col||'#4fca7a';
+  ctx.fillStyle=col;
+  ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x-14,y+20); ctx.lineTo(x+14,y+20); ctx.closePath(); ctx.fill();
+  // ground
+  ctx.strokeStyle='#2a2e44'; ctx.lineWidth=8;
+  ctx.beginPath(); ctx.moveTo(x-20,y+20); ctx.lineTo(x+20,y+20); ctx.stroke();
+  ctx.strokeStyle='#1e2236'; ctx.lineWidth=2;
+  for(var i=-2;i<=2;i++){
+    ctx.beginPath(); ctx.moveTo(x+i*10,y+20); ctx.lineTo(x+i*10-8,y+30); ctx.stroke();
+  }
+}
+
+function drawRoller(x,y,col){
+  col=col||'#4fca7a';
+  ctx.fillStyle=col;
+  ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x-12,y+18); ctx.lineTo(x+12,y+18); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#3a3f5c';
+  ctx.beginPath(); ctx.arc(x-8,y+24,5,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(x+8,y+24,5,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='#2a2e44'; ctx.lineWidth=6;
+  ctx.beginPath(); ctx.moveTo(x-20,y+30); ctx.lineTo(x+20,y+30); ctx.stroke();
+  ctx.strokeStyle='#1e2236'; ctx.lineWidth=2;
+  for(var i=-2;i<=2;i++){
+    ctx.beginPath(); ctx.moveTo(x+i*10,y+30); ctx.lineTo(x+i*10-8,y+40); ctx.stroke();
+  }
+}
+
+function drawFixed(x,y,side){
+  side=side||'left';
+  var wx=(side==='left')?x-18:x;
+  ctx.fillStyle='#2a2e44';
+  ctx.fillRect(wx,y-52,18,104);
+  ctx.strokeStyle='#3a3f5c'; ctx.lineWidth=1.5;
+  for(var i=0;i<8;i++){
+    var yy=y-50+i*14;
+    ctx.beginPath();
+    if(side==='left'){ctx.moveTo(x-18,yy);ctx.lineTo(x-30,yy+12);}
+    else             {ctx.moveTo(x+18,yy);ctx.lineTo(x+30,yy+12);}
+    ctx.stroke();
+  }
+}
+
+function drawFreeEnd(x,y){
+  ctx.strokeStyle='#3a3f5c'; ctx.lineWidth=2; ctx.setLineDash([4,4]);
+  ctx.beginPath(); ctx.moveTo(x,y-50); ctx.lineTo(x,y+50); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle='#3a3f5c'; ctx.font='12px Segoe UI';
+  ctx.fillText('자유단',x+6,y);
+}
+
+function setBadge(text, cls){
+  var b=document.getElementById('stability-badge');
+  b.textContent=text; b.className=cls;
+}
+
+/* ── Tab ①: 보 반력 ── */
+function drawBeamTab(){
+  var P    = +document.getElementById('pmag').value;
+  var xRat = +document.getElementById('xpos').value/100;
+  var sA   = document.getElementById('selA').value;
+  var sB   = document.getElementById('selB').value;
+
+  var bx0=110, bx1=CW-110, beamY=CH/2-10;
+  var L=bx1-bx0, xLoad=bx0+xRat*L;
+
+  // 반력 수 계산
+  var rxn={pin:2,roller:1,fixed:3,free:0};
+  var nRx=(rxn[sA]||0)+(rxn[sB]||0);
+
+  var Ax=0,Ay=0,MA=0,By=0;
+  var solvable = false;
+
+  if(nRx===3){
+    if(sA==='pin'&&sB==='roller'){
+      By=P*xRat; Ay=P-By; Ax=0; solvable=true;
+    } else if(sA==='roller'&&sB==='pin'){
+      Ay=P*(1-xRat); By=P-Ay; Ax=0; solvable=true;
+    } else if(sA==='fixed'&&sB==='free'){
+      Ay=P; Ax=0; MA=P*xRat*L; solvable=true;
+    } else if(sA==='pin'&&sB==='free'){
+      // 불안정 (ΣM 불성립) — 3개지만 불안정
+      nRx=2;
+    }
+  }
+
+  if(nRx<3)       setBadge('불안정 (미지수 '+nRx+'개) ✗','unstable');
+  else if(nRx===3) setBadge('정정 ✓','stable');
+  else             setBadge('부정정 (미지수 '+nRx+'개)','indet');
+
+  ctx.clearRect(0,0,CW,CH); drawGrid();
+
+  drawBeam(bx0,beamY,L);
+
+  // 지지 그리기
+  if(sA==='pin')    drawPin(bx0,beamY+10);
+  if(sA==='roller') drawRoller(bx0,beamY+10);
+  if(sA==='fixed')  drawFixed(bx0,beamY,'left');
+  if(sB==='pin')    drawPin(bx1,beamY+10);
+  if(sB==='roller') drawRoller(bx1,beamY+10);
+  if(sB==='free')   drawFreeEnd(bx1,beamY);
+
+  // 지점 라벨
+  ctx.fillStyle='#7a7f99'; ctx.font='bold 14px Segoe UI'; ctx.textAlign='center';
+  ctx.fillText('A',bx0,beamY+64); ctx.fillText('B',bx1,beamY+64);
+  ctx.textAlign='left';
+
+  // 하중 P
+  var pLen=Math.min(80,20+P*0.32);
+  arrow(xLoad,beamY-pLen-10,xLoad,beamY-10,'#4f8ef7','P='+P+'N',3);
+
+  // 하중 위치 치수선
+  ctx.strokeStyle='#4f8ef7'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+  ctx.beginPath(); ctx.moveTo(bx0,beamY-pLen-20); ctx.lineTo(xLoad,beamY-pLen-20); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle='#4f8ef7'; ctx.font='12px Segoe UI'; ctx.textAlign='center';
+  ctx.fillText('x = '+(xRat*100).toFixed(0)+'% · L',(bx0+xLoad)/2,beamY-pLen-26);
+  ctx.textAlign='left';
+
+  if(!solvable){
+    // 방정식 패널 업데이트 (불가)
+    ['eq-fx','eq-fy','eq-ma','eq-res'].forEach(function(id){
+      document.getElementById(id).textContent = nRx>3?'부정정 — 추가 조건 필요':'불안정 — 반력 부족';
+    });
+    return;
+  }
+
+  // 반력 화살표
+  var RS=0.55;
+  if(sA==='pin'||sA==='roller'){
+    if(Math.abs(Ay)>0.5) arrow(bx0,beamY+10+Math.min(Math.abs(Ay*RS),80),bx0,beamY+10,'#4fca7a','Ay='+Ay.toFixed(1)+'N',2.5);
+    if(Math.abs(Ax)>0.5) arrow(bx0-Math.min(Math.abs(Ax*RS),60),beamY,bx0,beamY,'#f7834f','Ax='+Ax.toFixed(1)+'N',2.5);
+  }
+  if(sA==='fixed'){
+    arrow(bx0,beamY+10+70,bx0,beamY+10,'#4fca7a','Ay='+Ay.toFixed(1)+'N',2.5);
+    // moment arc — 반시계(+) or 시계
+    var maVis = MA/L; // 시각화 스케일
+    arcArrow(bx0,beamY,40, 0.3*Math.PI, 1.7*Math.PI,'#f7d44f',false,'MA');
+    ctx.fillStyle='#f7d44f'; ctx.font='12px Segoe UI';
+    ctx.fillText('MA='+( MA/40).toFixed(0)+'N·m(scaled)',bx0+46,beamY-38);
+  }
+  if(sB==='roller'||sB==='pin'){
+    if(Math.abs(By)>0.5) arrow(bx1,beamY+10+Math.min(Math.abs(By*RS),80),bx1,beamY+10,'#4fca7a','By='+By.toFixed(1)+'N',2.5);
+  }
+
+  // 합력 검증 배너
+  var ok = Math.abs(Ay+By-P)<0.5;
+  ctx.fillStyle=ok?'#1a3a2a':'#3a1a1a';
+  ctx.beginPath(); ctx.roundRect(CW/2-160,12,320,26,6); ctx.fill();
+  ctx.fillStyle=ok?'#4fca7a':'#f74f4f';
+  ctx.font='bold 13px Segoe UI'; ctx.textAlign='center';
+  ctx.fillText('ΣFy = '+Ay.toFixed(1)+' + '+By.toFixed(1)+' − '+P+' = '+(Ay+By-P).toFixed(1)+' '+(ok?'✓':'✗'),CW/2,29);
+  ctx.textAlign='left';
+
+  // 방정식 패널
+  document.getElementById('eq-fx').textContent='Ax = 0 N';
+  document.getElementById('eq-fy').textContent='Ay + By = P  →  '+Ay.toFixed(1)+' + '+By.toFixed(1)+' = '+P;
+  if(sA==='fixed'){
+    document.getElementById('eq-ma').textContent='MA = P · x  →  '+(MA/40).toFixed(1)+' N·m (scaled)';
+    document.getElementById('eq-res').textContent='Ay='+P+'N, MA='+( MA/40).toFixed(0)+'N·m';
+  } else {
+    document.getElementById('eq-ma').textContent='ΣM_A: By·L = P·x  →  By = '+By.toFixed(1)+' N';
+    document.getElementById('eq-res').textContent='Ay='+Ay.toFixed(1)+'N, By='+By.toFixed(1)+'N';
+  }
+}
+
+/* ── Tab ②: 지지 조건 비교 ── */
+function drawSupportTab(){
+  ctx.clearRect(0,0,CW,CH); drawGrid();
+  setBadge('지지 조건 비교','stable');
+
+  var beamY=CH/2-10;
+  var configs=[
+    {label:'롤러 (Roller)',x:150,col:'#4fca7a',note:'반력 1개',
+     draw:function(x,y){drawRoller(x,y);}},
+    {label:'핀 (Pin)',x:430,col:'#4f8ef7',note:'반력 2개',
+     draw:function(x,y){drawPin(x,y);}},
+    {label:'고정단 (Fixed)',x:710,col:'#f7834f',note:'반력 3개',
+     draw:function(x,y){drawFixed(x,y,'left');}},
+  ];
+  var bHalf=100;
+
+  configs.forEach(function(cfg){
+    var x=cfg.x, col=cfg.col;
+    // mini beam
+    ctx.fillStyle='#2e3560';
+    ctx.beginPath(); ctx.roundRect(x-bHalf,beamY-10,bHalf*2,20,4); ctx.fill();
+    ctx.strokeStyle='#4f5a8f'; ctx.lineWidth=1.5; ctx.stroke();
+    cfg.draw(x,beamY+10);
+
+    // 하중
+    arrow(x+30,beamY-70,x+30,beamY-10,'#4f8ef7','P',2.5);
+
+    // 반력 화살표 표시
+    if(cfg.label.includes('롤러')){
+      arrow(x,beamY+80,x,beamY+10,col,'N',2.5);
+    } else if(cfg.label.includes('핀')){
+      arrow(x-30,beamY+80,x-30,beamY+10,col,'Ay',2.5);
+      arrow(x-bHalf-50,beamY-5,x-bHalf,beamY-5,'#f7834f','Ax',2.5);
+    } else {
+      arrow(x-40,beamY+80,x-40,beamY+10,col,'Ay',2.5);
+      arrow(x-bHalf-50,beamY-5,x-bHalf,beamY-5,'#f7834f','Ax',2.5);
+      arcArrow(x,beamY,36,0.3*Math.PI,1.7*Math.PI,'#f7d44f',false,'MA');
+    }
+
+    // 라벨
+    ctx.fillStyle=col; ctx.font='bold 14px Segoe UI'; ctx.textAlign='center';
+    ctx.fillText(cfg.label,x,beamY-28);
+    ctx.fillStyle='#7a7f99'; ctx.font='12px Segoe UI';
+    ctx.fillText(cfg.note,x,beamY-12);
+    ctx.textAlign='left';
+
+    // 반력 수 뱃지
+    var n=cfg.label.includes('롤러')?1:cfg.label.includes('핀')?2:3;
+    var bcol=['','#1a3a2a','#1a2d5a','#5a2a1a'][n];
+    var tcol=['','#4fca7a','#4f8ef7','#f7834f'][n];
+    ctx.fillStyle=bcol;
+    ctx.beginPath(); ctx.roundRect(x-28,beamY+100,56,26,8); ctx.fill();
+    ctx.fillStyle=tcol; ctx.font='bold 14px Segoe UI'; ctx.textAlign='center';
+    ctx.fillText(n+'개 반력',x,beamY+118);
+    ctx.textAlign='left';
+  });
+
+  // 정정 조건 설명
+  ctx.fillStyle='#1a1f35';
+  ctx.beginPath(); ctx.roundRect(CW/2-240,CH-42,480,28,8); ctx.fill();
+  ctx.fillStyle='#7a7f99'; ctx.font='13px Segoe UI'; ctx.textAlign='center';
+  ctx.fillText('정정 조건: 총 반력 수 = 3  (ΣFx, ΣFy, ΣM 3개 방정식)',CW/2,CH-24);
+  ctx.textAlign='left';
+}
+
+/* ── Tab ③: 복수 하중 ── */
+function drawMomentTab(){
+  var P    = +document.getElementById('pmag').value;
+  var xRat = +document.getElementById('xpos').value/100;
+  var P2   = +document.getElementById('p2mag').value;
+  var xRat2= 0.72;
+
+  var bx0=110, bx1=CW-110, beamY=CH/2-10;
+  var L=bx1-bx0;
+  var xLoad =bx0+xRat *L;
+  var xLoad2=bx0+xRat2*L;
+
+  // ΣM_A=0: By·L = P·x1 + P2·x2
+  var By=(P*xRat*L + P2*xRat2*L)/L;  // = P*xRat + P2*xRat2
+  var Ay=P+P2-By;
+
+  ctx.clearRect(0,0,CW,CH); drawGrid();
+  setBadge('정정 ✓','stable');
+
+  drawBeam(bx0,beamY,L);
+  drawPin(bx0,beamY+10);
+  drawRoller(bx1,beamY+10);
+
+  ctx.fillStyle='#7a7f99'; ctx.font='bold 14px Segoe UI'; ctx.textAlign='center';
+  ctx.fillText('A',bx0,beamY+64); ctx.fillText('B',bx1,beamY+64);
+  ctx.textAlign='left';
+
+  // 하중 P1
+  var s1=Math.min(80,20+P*0.32);
+  arrow(xLoad,beamY-s1-10,xLoad,beamY-10,'#4f8ef7','P₁='+P+'N',3);
+
+  // 하중 P2
+  var s2=Math.min(80,20+P2*0.32);
+  arrow(xLoad2,beamY-s2-10,xLoad2,beamY-10,'#b47ef7','P₂='+P2+'N',3);
+
+  // 반력
+  var RS=0.55;
+  arrow(bx0,beamY+10+Math.min(Math.abs(Ay*RS),80),bx0,beamY+10,'#4fca7a','Ay='+Ay.toFixed(1)+'N',2.5);
+  arrow(bx1,beamY+10+Math.min(Math.abs(By*RS),80),bx1,beamY+10,'#4fca7a','By='+By.toFixed(1)+'N',2.5);
+
+  // 모멘트 팔 점선 (A 기준)
+  ctx.strokeStyle='#f7d44f'; ctx.lineWidth=1; ctx.setLineDash([4,3]);
+  ctx.beginPath(); ctx.moveTo(bx0,beamY+10); ctx.lineTo(xLoad,beamY+10); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(bx0,beamY+24); ctx.lineTo(xLoad2,beamY+24); ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.fillStyle='#f7d44f'; ctx.font='12px Segoe UI'; ctx.textAlign='center';
+  ctx.fillText('P₁·x₁ = '+(P*xRat*L/40).toFixed(0)+'N·m',(bx0+xLoad)/2,beamY+30);
+  ctx.fillText('P₂·x₂ = '+(P2*xRat2*L/40).toFixed(0)+'N·m',(bx0+xLoad2)/2,beamY+46);
+  ctx.textAlign='left';
+
+  // 검증 배너
+  var ok=Math.abs(Ay+By-P-P2)<0.5;
+  ctx.fillStyle=ok?'#1a3a2a':'#3a1a1a';
+  ctx.beginPath(); ctx.roundRect(CW/2-180,12,360,26,6); ctx.fill();
+  ctx.fillStyle=ok?'#4fca7a':'#f74f4f';
+  ctx.font='bold 13px Segoe UI'; ctx.textAlign='center';
+  ctx.fillText('ΣFy = '+Ay.toFixed(1)+' + '+By.toFixed(1)+' − '+(P+P2)+' = '+(Ay+By-P-P2).toFixed(1)+' '+(ok?'✓':'✗'),CW/2,29);
+  ctx.textAlign='left';
+
+  // 방정식 패널
+  document.getElementById('eq-fx').textContent='Ax = 0 N';
+  document.getElementById('eq-fy').textContent='Ay + By = P₁+P₂ = '+(P+P2)+' N';
+  document.getElementById('eq-ma').textContent='ΣM_A: By·L = P₁·x₁ + P₂·x₂';
+  document.getElementById('eq-res').textContent='Ay='+Ay.toFixed(1)+'N, By='+By.toFixed(1)+'N';
+}
+
+/* ── 탭 전환 ── */
+function setTab(name){
+  currentTab=name;
+  document.querySelectorAll('.tab-bar button').forEach(function(b,i){
+    b.classList.toggle('active',['beam','support','moment'][i]===name);
+  });
+  document.getElementById('support-sel-row').style.display=name==='beam'?'flex':'none';
+  document.getElementById('lbl-p2').style.display=name==='moment'?'':'none';
+  document.getElementById('p2mag').style.display =name==='moment'?'':'none';
+  draw();
+}
+
+/* ── 애니메이션 ── */
+function toggleAnim(){
+  animating=!animating;
+  document.getElementById('btn-anim').textContent=animating?'⏸ 정지':'▶ 하중 이동';
+  if(animating) requestAnimationFrame(animLoop);
+}
+function animLoop(){
+  if(!animating)return;
+  animT+=0.005*animDir;
+  if(animT>=0.94||animT<=0.06) animDir*=-1;
+  document.getElementById('xpos').value=Math.round(animT*100);
+  document.getElementById('xv').textContent=Math.round(animT*100);
+  draw();
+  requestAnimationFrame(animLoop);
+}
+
+function draw(){
+  if(currentTab==='beam')         drawBeamTab();
+  else if(currentTab==='support') drawSupportTab();
+  else                            drawMomentTab();
+}
+
+function updateLabels(){
+  document.getElementById('pv').textContent =document.getElementById('pmag').value;
+  document.getElementById('xv').textContent =document.getElementById('xpos').value;
+  document.getElementById('p2v').textContent=document.getElementById('p2mag').value;
+}
+
+function resetAll(){
+  animating=false;
+  document.getElementById('btn-anim').textContent='▶ 하중 이동';
+  document.getElementById('pmag').value=120;
+  document.getElementById('xpos').value=40;
+  document.getElementById('p2mag').value=80;
+  document.getElementById('selA').value='pin';
+  document.getElementById('selB').value='roller';
+  animT=0.4; animDir=1;
+  updateLabels(); draw();
+}
+
+['pmag','xpos','p2mag'].forEach(function(id){
+  document.getElementById(id).addEventListener('input',function(){updateLabels();draw();});
+});
+
+updateLabels();
+draw();
+</script>
 </body>
 </html>

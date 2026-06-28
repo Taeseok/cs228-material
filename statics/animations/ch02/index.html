@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ch.02 — 힘 벡터 합성 애니메이션</title>
+<link rel="stylesheet" href="../shared.css">
+<style>
+  #canvas-wrap { position: relative; }
+  #tooltip {
+    position: absolute;
+    background: rgba(30,33,50,0.95);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 13px;
+    pointer-events: none;
+    display: none;
+  }
+  .tab-bar { display:flex; gap:6px; margin-bottom:16px; }
+  .tab-bar button { background: var(--border); font-size:13px; padding:6px 14px; }
+  .tab-bar button.active { background: var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="chapter-tag">CH 02</span>
+  <h1>Force Vectors — 힘 벡터 합성과 분해</h1>
+</header>
+
+<div class="container">
+
+  <!-- 탭 -->
+  <div class="tab-bar">
+    <button class="active" onclick="setTab('compose')">벡터 합성</button>
+    <button onclick="setTab('decompose')">성분 분해</button>
+    <button onclick="setTab('dot')">내적</button>
+  </div>
+
+  <!-- 캔버스 -->
+  <div class="card" id="canvas-wrap">
+    <canvas id="c" width="860" height="420"></canvas>
+    <div id="tooltip"></div>
+
+    <div class="controls">
+      <label>F₁ 크기: <span id="f1v">80</span> N</label>
+      <input type="range" id="f1mag" min="20" max="150" value="80">
+
+      <label>F₁ 각도: <span id="f1av">30</span>°</label>
+      <input type="range" id="f1ang" min="-170" max="170" value="30">
+
+      <label>F₂ 크기: <span id="f2v">60</span> N</label>
+      <input type="range" id="f2mag" min="20" max="150" value="60">
+
+      <label>F₂ 각도: <span id="f2av">120</span>°</label>
+      <input type="range" id="f2ang" min="-170" max="170" value="120">
+
+      <button onclick="toggleAnim()">▶ 애니메이션</button>
+      <button class="secondary" onclick="resetSliders()">초기화</button>
+    </div>
+
+    <div class="info-grid" id="info-grid">
+      <div class="info-item"><div class="label">F₁</div><div class="value" id="if1">—</div></div>
+      <div class="info-item"><div class="label">F₂</div><div class="value" id="if2">—</div></div>
+      <div class="info-item"><div class="label">합력 FR</div><div class="value" id="ifr">—</div></div>
+      <div class="info-item"><div class="label">합력 방향</div><div class="value" id="ifra">—</div></div>
+    </div>
+  </div>
+
+  <!-- 수식 카드 -->
+  <div class="card">
+    <h2>핵심 공식</h2>
+    <div class="formula">F_Rx = ΣFx = F₁cos θ₁ + F₂cos θ₂</div>
+    <div class="formula">F_Ry = ΣFy = F₁sin θ₁ + F₂sin θ₂</div>
+    <div class="formula">|F_R| = √(F_Rx² + F_Ry²) ,  θ_R = atan2(F_Ry, F_Rx)</div>
+    <p style="margin-top:12px">슬라이더를 움직여 두 힘의 크기와 방향을 바꾸면 합력(초록 화살표)이 실시간으로 업데이트됩니다.</p>
+  </div>
+
+  <div class="nav-links card">
+    <a href="../../chapters/ch02-force-vectors/">← 개념 노트</a>
+    <a href="../../slides/ch02/">강의 슬라이드 →</a>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+const O = {x: W/2, y: H/2};  // origin
+const SCALE = 1.8; // px per N
+
+let animating = false, animT = 0, animDir = 1;
+let currentTab = 'compose';
+
+function getVals() {
+  return {
+    f1m: +document.getElementById('f1mag').value,
+    f1a: +document.getElementById('f1ang').value * Math.PI/180,
+    f2m: +document.getElementById('f2mag').value,
+    f2a: +document.getElementById('f2ang').value * Math.PI/180,
+  };
+}
+
+function arrow(x1,y1,x2,y2, color, label, dashed=false, width=2.5) {
+  const dx=x2-x1, dy=y2-y1, len=Math.sqrt(dx*dx+dy*dy);
+  if(len < 1) return;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  if(dashed) ctx.setLineDash([6,4]);
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  ctx.setLineDash([]);
+  // arrowhead
+  const angle = Math.atan2(dy,dx);
+  const hs = 12;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(x2,y2);
+  ctx.lineTo(x2-hs*Math.cos(angle-0.4), y2-hs*Math.sin(angle-0.4));
+  ctx.lineTo(x2-hs*Math.cos(angle+0.4), y2-hs*Math.sin(angle+0.4));
+  ctx.closePath(); ctx.fill();
+  // label
+  if(label){
+    ctx.fillStyle = color;
+    ctx.font = 'bold 14px Segoe UI';
+    const mx=(x1+x2)/2, my=(y1+y2)/2;
+    ctx.fillText(label, mx+8, my-8);
+  }
+  ctx.restore();
+}
+
+function drawGrid() {
+  ctx.strokeStyle = '#1e2236';
+  ctx.lineWidth = 1;
+  for(let x=0;x<W;x+=40){ ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke(); }
+  for(let y=0;y<H;y+=40){ ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke(); }
+  // axes
+  ctx.strokeStyle='#2e3148'; ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(0,O.y);ctx.lineTo(W,O.y);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(O.x,0);ctx.lineTo(O.x,H);ctx.stroke();
+  ctx.fillStyle='#3a3f5c'; ctx.font='12px Segoe UI';
+  ctx.fillText('+x',W-24,O.y-6);
+  ctx.fillText('+y',O.x+6,14);
+}
+
+function drawComposeTab(v) {
+  const {f1m,f1a,f2m,f2a} = v;
+  const f1x=f1m*Math.cos(f1a)*SCALE, f1y=-f1m*Math.sin(f1a)*SCALE;
+  const f2x=f2m*Math.cos(f2a)*SCALE, f2y=-f2m*Math.sin(f2a)*SCALE;
+  const frx=f1x+f2x, fry=f1y+f2y;
+
+  // F1 from origin
+  arrow(O.x, O.y, O.x+f1x, O.y+f1y, '#4f8ef7', `F₁=${f1m}N`);
+  // F2 from origin
+  arrow(O.x, O.y, O.x+f2x, O.y+f2y, '#f7834f', `F₂=${f2m}N`);
+  // F2 translated (tail-to-head)
+  arrow(O.x+f1x, O.y+f1y, O.x+f1x+f2x, O.y+f1y+f2y, '#f7834f', '', true, 1.5);
+  // F1 translated
+  arrow(O.x+f2x, O.y+f2y, O.x+f2x+f1x, O.y+f2y+f1y, '#4f8ef7', '', true, 1.5);
+  // Resultant
+  arrow(O.x,O.y, O.x+frx, O.y+fry, '#4fca7a', `FR`, false, 3.5);
+
+  // angle arc for F1
+  const arcR=30;
+  ctx.strokeStyle='#4f8ef7'; ctx.lineWidth=1.2;
+  ctx.beginPath(); ctx.arc(O.x,O.y,arcR,0,-f1a,f1a<0); ctx.stroke();
+  ctx.fillStyle='#4f8ef7'; ctx.font='12px Segoe UI';
+  ctx.fillText(`θ₁=${document.getElementById('f1ang').value}°`, O.x+arcR+4, O.y-6);
+
+  // update info
+  const frMag = Math.sqrt((frx/SCALE)**2+(fry/SCALE)**2);
+  const frAng = Math.atan2(-fry/SCALE, frx/SCALE)*180/Math.PI;
+  document.getElementById('if1').textContent = f1m+' N';
+  document.getElementById('if2').textContent = f2m+' N';
+  document.getElementById('ifr').textContent = frMag.toFixed(1)+' N';
+  document.getElementById('ifra').textContent = frAng.toFixed(1)+'°';
+}
+
+function drawDecomposeTab(v) {
+  const {f1m,f1a} = v;
+  const fx=f1m*Math.cos(f1a)*SCALE, fy=-f1m*Math.sin(f1a)*SCALE;
+  // component dashes
+  arrow(O.x,O.y, O.x+fx, O.y, '#f7834f', `Fx=${( f1m*Math.cos(f1a)).toFixed(1)}N`, true);
+  arrow(O.x+fx,O.y, O.x+fx, O.y+fy, '#f7834f', '', true);
+  arrow(O.x,O.y+fy, O.x+fx, O.y+fy, '#f7834f', '', true, 1.2);
+  arrow(O.x,O.y, O.x, O.y+fy, '#4f8ef7', `Fy=${( f1m*Math.sin(f1a)).toFixed(1)}N`, true);
+  // F1
+  arrow(O.x,O.y, O.x+fx, O.y+fy, '#4fca7a', `F=${f1m}N`, false, 3);
+  // angle
+  const angle = +document.getElementById('f1ang').value;
+  ctx.fillStyle='#e8eaf0'; ctx.font='bold 13px Segoe UI';
+  ctx.fillText(`θ = ${angle}°`, O.x+20, O.y-14);
+  document.getElementById('if1').textContent = f1m+' N';
+  document.getElementById('if2').textContent = '—';
+  document.getElementById('ifr').textContent = `Fx=${(f1m*Math.cos(f1a)).toFixed(1)} N`;
+  document.getElementById('ifra').textContent = `Fy=${(f1m*Math.sin(f1a)).toFixed(1)} N`;
+}
+
+function drawDotTab(v) {
+  const {f1m,f1a,f2m,f2a} = v;
+  const f1x=f1m*Math.cos(f1a)*SCALE, f1y=-f1m*Math.sin(f1a)*SCALE;
+  const f2x=f2m*Math.cos(f2a)*SCALE, f2y=-f2m*Math.sin(f2a)*SCALE;
+  arrow(O.x,O.y, O.x+f1x, O.y+f1y, '#4f8ef7', `A`);
+  arrow(O.x,O.y, O.x+f2x, O.y+f2y, '#f7834f', `B`);
+  // angle between
+  const dot = (f1m*Math.cos(f1a))*(f2m*Math.cos(f2a))+(f1m*Math.sin(f1a))*(f2m*Math.sin(f2a));
+  const theta = Math.acos(Math.max(-1,Math.min(1,dot/(f1m*f2m))));
+  const thetaDeg = (theta*180/Math.PI).toFixed(1);
+  // arc between vectors
+  const minA = Math.min(f1a,f2a), maxA = Math.max(f1a,f2a);
+  ctx.strokeStyle='#f7d44f'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.arc(O.x,O.y,50,-f2a,-f1a,f2a<f1a); ctx.stroke();
+  ctx.fillStyle='#f7d44f'; ctx.font='bold 13px Segoe UI';
+  ctx.fillText(`θ=${thetaDeg}°`, O.x+55, O.y-10);
+  // projection of A onto B
+  const bUnit={x:Math.cos(f2a),y:-Math.sin(f2a)};
+  const projLen=(dot/f2m)*SCALE;
+  arrow(O.x,O.y, O.x+bUnit.x*projLen, O.y+bUnit.y*projLen, '#4fca7a','A·B̂');
+  document.getElementById('if1').textContent = '|A·B|='+Math.abs(dot).toFixed(1);
+  document.getElementById('if2').textContent = 'θ='+thetaDeg+'°';
+  document.getElementById('ifr').textContent = 'proj='+(dot/f2m).toFixed(1)+' N';
+  document.getElementById('ifra').textContent = '내적='+dot.toFixed(1);
+}
+
+function draw() {
+  ctx.clearRect(0,0,W,H);
+  drawGrid();
+  const v = getVals();
+  if(currentTab==='compose') drawComposeTab(v);
+  else if(currentTab==='decompose') drawDecomposeTab(v);
+  else drawDotTab(v);
+}
+
+function setTab(name) {
+  currentTab = name;
+  document.querySelectorAll('.tab-bar button').forEach((b,i)=>{
+    b.classList.toggle('active', ['compose','decompose','dot'][i]===name);
+  });
+  draw();
+}
+
+function toggleAnim() {
+  animating = !animating;
+  document.querySelector('.controls button').textContent = animating?'⏸ 정지':'▶ 애니메이션';
+  if(animating) requestAnimationFrame(animate);
+}
+
+function animate() {
+  if(!animating) return;
+  animT += 0.018*animDir;
+  if(animT>1||animT<0) animDir=-animDir;
+  document.getElementById('f1ang').value = Math.round(-170+animT*340);
+  document.getElementById('f2ang').value = Math.round(120 - animT*60);
+  updateLabels();
+  draw();
+  requestAnimationFrame(animate);
+}
+
+function updateLabels() {
+  document.getElementById('f1v').textContent = document.getElementById('f1mag').value;
+  document.getElementById('f1av').textContent = document.getElementById('f1ang').value;
+  document.getElementById('f2v').textContent = document.getElementById('f2mag').value;
+  document.getElementById('f2av').textContent = document.getElementById('f2ang').value;
+}
+
+function resetSliders() {
+  document.getElementById('f1mag').value=80;
+  document.getElementById('f1ang').value=30;
+  document.getElementById('f2mag').value=60;
+  document.getElementById('f2ang').value=120;
+  updateLabels(); draw();
+}
+
+// bind sliders
+['f1mag','f1ang','f2mag','f2ang'].forEach(id=>{
+  document.getElementById(id).addEventListener('input',()=>{ updateLabels(); draw(); });
+});
+
+updateLabels();
+draw();
+</script>
+</body>
+</html>

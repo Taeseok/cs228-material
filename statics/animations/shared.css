@@ -1,0 +1,135 @@
+/* shared.css — 모든 정역학 애니메이션 공통 스타일 */
+:root {
+  --bg: #0f1117;
+  --panel: #1a1d27;
+  --border: #2e3148;
+  --accent: #4f8ef7;
+  --accent2: #f7834f;
+  --green: #4fca7a;
+  --red: #f74f4f;
+  --yellow: #f7d44f;
+  --text: #e8eaf0;
+  --muted: #7a7f99;
+  --font: 'Segoe UI', system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+header {
+  width: 100%;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 28px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+header .chapter-tag {
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 20px;
+  letter-spacing: .6px;
+}
+header h1 { font-size: 18px; font-weight: 600; }
+
+.container {
+  width: min(960px, 96vw);
+  padding: 28px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+}
+
+canvas {
+  display: block;
+  border-radius: 8px;
+  background: #13161f;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 16px;
+}
+
+button {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  padding: 8px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity .15s;
+}
+button:hover { opacity: .85; }
+button.secondary {
+  background: var(--border);
+  color: var(--text);
+}
+
+input[type=range] {
+  accent-color: var(--accent);
+  width: 160px;
+}
+
+label { font-size: 13px; color: var(--muted); }
+
+.formula {
+  background: #13161f;
+  border-left: 3px solid var(--accent);
+  padding: 12px 16px;
+  border-radius: 0 8px 8px 0;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  color: var(--yellow);
+  margin-top: 12px;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+.info-item {
+  background: #13161f;
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+.info-item .label { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+.info-item .value { font-size: 18px; font-weight: 700; color: var(--accent); }
+
+.nav-links {
+  display: flex;
+  gap: 12px;
+  font-size: 13px;
+}
+.nav-links a { color: var(--accent); text-decoration: none; }
+.nav-links a:hover { text-decoration: underline; }
+
+h2 { font-size: 15px; font-weight: 600; margin-bottom: 8px; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; }
+p { font-size: 14px; line-height: 1.65; color: var(--muted); }

@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ch.02 Force Vectors — 강의 슬라이드</title>
+<style>
+/* ─── Reset & Base ─── */
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{width:100%;height:100%;background:#0c0e18;font-family:'Segoe UI',system-ui,sans-serif;overflow:hidden;}
+
+/* ─── Slide deck ─── */
+.deck{width:100vw;height:100vh;position:relative;}
+.slide{
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;
+  padding:60px 80px;
+  opacity:0;pointer-events:none;
+  transition:opacity .4s,transform .4s;
+  transform:translateX(60px);
+}
+.slide.active{opacity:1;pointer-events:all;transform:translateX(0);}
+.slide.prev{opacity:0;transform:translateX(-60px);}
+
+/* ─── Slide types ─── */
+.slide-title{
+  background:linear-gradient(135deg,#0f1117 0%,#1a1f35 100%);
+  justify-content:center;align-items:center;text-align:center;
+}
+.slide-content{background:#0f1117;}
+.slide-two-col{background:#0f1117;flex-direction:row;gap:40px;}
+
+/* ─── Typography ─── */
+.chapter-badge{
+  background:#4f8ef7;color:#fff;
+  font-size:13px;font-weight:700;padding:4px 12px;border-radius:20px;
+  letter-spacing:.6px;margin-bottom:20px;display:inline-block;
+}
+h1{font-size:52px;font-weight:800;line-height:1.1;color:#fff;margin-bottom:16px;}
+h1 span{color:#4f8ef7;}
+.subtitle{font-size:20px;color:#7a7f99;margin-bottom:0;}
+h2{font-size:28px;font-weight:700;color:#fff;margin-bottom:24px;padding-bottom:12px;border-bottom:2px solid #2e3148;}
+h3{font-size:20px;font-weight:600;color:#4f8ef7;margin:20px 0 10px;}
+p,li{font-size:17px;color:#b0b5cc;line-height:1.7;}
+ul{padding-left:20px;}
+li{margin-bottom:8px;}
+strong{color:#e8eaf0;}
+
+/* ─── Components ─── */
+.formula-box{
+  background:#13161f;border-left:4px solid #4f8ef7;
+  border-radius:0 10px 10px 0;padding:16px 20px;margin:14px 0;
+  font-family:'Courier New',monospace;font-size:16px;color:#f7d44f;
+}
+.highlight-box{
+  background:#1a1f35;border:1px solid #2e3148;border-radius:10px;
+  padding:16px 20px;margin:14px 0;
+}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:12px;}
+.col{background:#13161f;border-radius:10px;padding:16px 18px;}
+.col h4{font-size:14px;color:#4f8ef7;font-weight:700;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px;}
+table{width:100%;border-collapse:collapse;margin-top:12px;}
+th{background:#1a1f35;color:#7a7f99;font-size:13px;padding:10px 12px;text-align:left;font-weight:600;}
+td{padding:10px 12px;font-size:15px;color:#b0b5cc;border-bottom:1px solid #1e2236;}
+tr:hover td{background:#13161f;}
+.tag{display:inline-block;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:700;}
+.tag-blue{background:#1a2d5a;color:#4f8ef7;}
+.tag-orange{background:#5a2a1a;color:#f7834f;}
+.tag-green{background:#1a3a2a;color:#4fca7a;}
+canvas{border-radius:10px;background:#13161f;}
+
+/* ─── Nav ─── */
+.nav{
+  position:fixed;bottom:24px;right:32px;
+  display:flex;gap:10px;align-items:center;z-index:100;
+}
+.nav button{
+  background:#2e3148;border:none;color:#e8eaf0;
+  width:44px;height:44px;border-radius:50%;font-size:18px;cursor:pointer;
+  transition:background .15s;display:flex;align-items:center;justify-content:center;
+}
+.nav button:hover{background:#4f8ef7;}
+.slide-counter{color:#7a7f99;font-size:13px;min-width:50px;text-align:center;}
+.progress{
+  position:fixed;bottom:0;left:0;height:3px;background:#4f8ef7;
+  transition:width .3s;z-index:100;
+}
+.slide-num{
+  position:fixed;top:20px;right:28px;
+  color:#3a3f5c;font-size:13px;z-index:100;
+}
+kbd{
+  background:#1e2236;border:1px solid #3a3f5c;border-radius:4px;
+  padding:2px 7px;font-size:12px;color:#7a7f99;font-family:monospace;
+}
+
+/* ─── Mini canvas for vector viz ─── */
+.canvas-wrap{position:relative;flex:1;}
+.side-panel{flex:1;display:flex;flex-direction:column;gap:16px;}
+</style>
+</head>
+<body>
+<div class="deck" id="deck">
+
+<!-- ① 표지 -->
+<div class="slide slide-title active" data-idx="0">
+  <div class="chapter-badge">CHAPTER 02</div>
+  <h1>Force <span>Vectors</span></h1>
+  <p class="subtitle">힘 벡터 — 합성, 분해, 내적</p>
+  <p style="margin-top:40px;font-size:14px;color:#3a3f5c;">Engineering Mechanics: Statics — Hibbeler 14e</p>
+</div>
+
+<!-- ② 스칼라 vs 벡터 -->
+<div class="slide slide-content" data-idx="1">
+  <h2>스칼라 vs 벡터</h2>
+  <div class="two-col">
+    <div class="col">
+      <h4>스칼라 (Scalar)</h4>
+      <p>크기<strong>만</strong> 있는 물리량</p>
+      <ul style="margin-top:10px;">
+        <li>질량 (kg)</li>
+        <li>온도 (°C)</li>
+        <li>시간 (s)</li>
+        <li>에너지 (J)</li>
+      </ul>
+    </div>
+    <div class="col">
+      <h4>벡터 (Vector)</h4>
+      <p>크기 <strong>+ 방향</strong>이 있는 물리량</p>
+      <ul style="margin-top:10px;">
+        <li>힘 <strong>F</strong> (N)</li>
+        <li>속도 <strong>v</strong> (m/s)</li>
+        <li>변위 <strong>d</strong> (m)</li>
+        <li>가속도 <strong>a</strong> (m/s²)</li>
+      </ul>
+    </div>
+  </div>
+  <div class="highlight-box" style="margin-top:20px;">
+    <p>벡터 표기: <strong>F</strong> (볼드체) 또는 F⃗ (화살표) &nbsp;|&nbsp; 크기: |<strong>F</strong>| = F</p>
+  </div>
+</div>
+
+<!-- ③ 평행사변형 법칙 -->
+<div class="slide slide-content" data-idx="2">
+  <h2>벡터 덧셈 — 평행사변형 법칙</h2>
+  <canvas id="c-paral" width="760" height="260"></canvas>
+  <div class="two-col" style="margin-top:16px;">
+    <div class="formula-box">F_R = √(F₁² + F₂² - 2F₁F₂cosθ)&nbsp;&nbsp;(코사인 법칙)</div>
+    <div class="formula-box">F₁/sinθ₁ = F₂/sinθ₂ = F_R/sinθ&nbsp;&nbsp;(사인 법칙)</div>
+  </div>
+</div>
+
+<!-- ④ 성분 분해 -->
+<div class="slide slide-content" data-idx="3">
+  <h2>2D 힘의 성분 분해</h2>
+  <canvas id="c-comp" width="760" height="240"></canvas>
+  <div class="two-col" style="margin-top:16px;">
+    <div class="formula-box">Fx = F cosθ<br>Fy = F sinθ</div>
+    <div class="formula-box">F = √(Fx² + Fy²)<br>θ = atan2(Fy, Fx)</div>
+  </div>
+  <div class="highlight-box">
+    <p>💡 <strong>합력 계산 순서:</strong> 각 힘을 x, y 성분으로 분해 → ΣFx, ΣFy 계산 → 합력 크기·방향 계산</p>
+  </div>
+</div>
+
+<!-- ⑤ 3D 벡터 -->
+<div class="slide slide-content" data-idx="4">
+  <h2>3D 힘 벡터 (직교 성분)</h2>
+  <div class="formula-box" style="font-size:18px;">
+    <strong>F</strong> = Fx î + Fy ĵ + Fz k̂
+  </div>
+  <div class="formula-box">
+    |F| = √(Fx² + Fy² + Fz²)
+  </div>
+  <h3>방향 코사인</h3>
+  <table>
+    <tr><th>각도</th><th>정의</th><th>관계</th></tr>
+    <tr><td>α (x축)</td><td>cosα = Fx / F</td><td rowspan="3" style="color:#4fca7a;">cos²α + cos²β + cos²γ = 1</td></tr>
+    <tr><td>β (y축)</td><td>cosβ = Fy / F</td></tr>
+    <tr><td>γ (z축)</td><td>cosγ = Fz / F</td></tr>
+  </table>
+  <div class="highlight-box" style="margin-top:16px;">
+    <p>단위 벡터: <strong>û</strong> = <strong>F</strong> / F = cosα î + cosβ ĵ + cosγ k̂</p>
+  </div>
+</div>
+
+<!-- ⑥ 내적 -->
+<div class="slide slide-content" data-idx="5">
+  <h2>내적 (Dot Product)</h2>
+  <div class="formula-box" style="font-size:18px;">
+    <strong>A</strong> · <strong>B</strong> = AB cosθ = AxBx + AyBy + AzBz
+  </div>
+  <div class="two-col">
+    <div class="col">
+      <h4>두 벡터 사이 각도</h4>
+      <div class="formula-box">θ = cos⁻¹( A·B / (AB) )</div>
+    </div>
+    <div class="col">
+      <h4>벡터의 축 투영</h4>
+      <div class="formula-box">F_u = <strong>F</strong> · û</div>
+      <p style="font-size:14px;margin-top:8px;">û 방향으로의 스칼라 성분</p>
+    </div>
+  </div>
+  <h3 style="margin-top:20px;">내적의 특성</h3>
+  <ul>
+    <li>교환 법칙 성립: <strong>A</strong>·<strong>B</strong> = <strong>B</strong>·<strong>A</strong></li>
+    <li>수직인 두 벡터: <strong>A</strong>·<strong>B</strong> = 0</li>
+    <li>단위 벡터: î·î = 1, î·ĵ = 0</li>
+  </ul>
+</div>
+
+<!-- ⑦ 요약 -->
+<div class="slide slide-content" data-idx="6">
+  <h2>Chapter 2 요약</h2>
+  <table>
+    <tr><th>개념</th><th>핵심 공식</th><th>비고</th></tr>
+    <tr><td>합력 (2D)</td><td>F_R = √(ΣFx² + ΣFy²)</td><td>성분법이 기본</td></tr>
+    <tr><td>방향각</td><td>θ = atan2(ΣFy, ΣFx)</td><td>사분면 주의</td></tr>
+    <tr><td>3D 단위벡터</td><td>û = F / |F|</td><td>크기 = 1</td></tr>
+    <tr><td>방향 코사인</td><td>cos²α+cos²β+cos²γ=1</td><td>항상 성립</td></tr>
+    <tr><td>내적</td><td>A·B = AB cosθ</td><td>각도·투영 계산</td></tr>
+  </table>
+  <div class="highlight-box" style="margin-top:20px;">
+    <p>👉 <a href="../../animations/ch02/" style="color:#4f8ef7;">인터랙티브 애니메이션</a>으로 벡터 합성을 직접 조작해보세요.</p>
+  </div>
+</div>
+
+</div><!-- .deck -->
+
+<div class="slide-num" id="snum">1 / 7</div>
+<div class="progress" id="prog"></div>
+<div class="nav">
+  <button onclick="go(-1)">←</button>
+  <span class="slide-counter" id="cnt">1 / 7</span>
+  <button onclick="go(1)">→</button>
+</div>
+
+<script>
+const slides=[...document.querySelectorAll('.slide')];
+let cur=0;
+const total=slides.length;
+
+function go(d){
+  slides[cur].className='slide'+(cur>0?' prev':'');
+  cur=Math.max(0,Math.min(total-1,cur+d));
+  slides[cur].className='slide active';
+  document.getElementById('cnt').textContent=(cur+1)+' / '+total;
+  document.getElementById('snum').textContent=(cur+1)+' / '+total;
+  document.getElementById('prog').style.width=((cur+1)/total*100)+'%';
+  if(cur===2)drawParal();
+  if(cur===3)drawComp();
+}
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'||e.key===' ')go(1);
+  if(e.key==='ArrowLeft')go(-1);
+});
+
+// Slide 3: parallelogram
+function drawParal(){
+  const c=document.getElementById('c-paral');
+  if(!c)return;
+  const ctx=c.getContext('2d'),W=c.width,H=c.height;
+  ctx.clearRect(0,0,W,H);
+  const O={x:120,y:H-60};
+  const a1=35*Math.PI/180,a2=110*Math.PI/180;
+  const f1=160,f2=130;
+  const s=1;
+  const v1={x:f1*Math.cos(a1)*s,y:-f1*Math.sin(a1)*s};
+  const v2={x:f2*Math.cos(a2)*s,y:-f2*Math.sin(a2)*s};
+  function arr(x1,y1,x2,y2,col,lbl){
+    ctx.save();ctx.strokeStyle=col;ctx.lineWidth=3;
+    ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+    const ang=Math.atan2(y2-y1,x2-x1),hs=12;
+    ctx.fillStyle=col;ctx.beginPath();
+    ctx.moveTo(x2,y2);
+    ctx.lineTo(x2-hs*Math.cos(ang-0.4),y2-hs*Math.sin(ang-0.4));
+    ctx.lineTo(x2-hs*Math.cos(ang+0.4),y2-hs*Math.sin(ang+0.4));
+    ctx.closePath();ctx.fill();
+    if(lbl){ctx.font='bold 16px Segoe UI';ctx.fillText(lbl,(x1+x2)/2+8,(y1+y2)/2-8);}
+    ctx.restore();
+  }
+  // grid
+  ctx.strokeStyle='#1e2236';ctx.lineWidth=1;
+  for(let x=0;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for(let y=0;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  // parallelogram (dashed)
+  ctx.strokeStyle='#2e3148';ctx.lineWidth=1.5;ctx.setLineDash([5,3]);
+  ctx.beginPath();ctx.moveTo(O.x+v1.x,O.y+v1.y);ctx.lineTo(O.x+v1.x+v2.x,O.y+v1.y+v2.y);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(O.x+v2.x,O.y+v2.y);ctx.lineTo(O.x+v1.x+v2.x,O.y+v1.y+v2.y);ctx.stroke();
+  ctx.setLineDash([]);
+  arr(O.x,O.y,O.x+v1.x,O.y+v1.y,'#4f8ef7','F₁');
+  arr(O.x,O.y,O.x+v2.x,O.y+v2.y,'#f7834f','F₂');
+  arr(O.x,O.y,O.x+v1.x+v2.x,O.y+v1.y+v2.y,'#4fca7a','F_R');
+  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(O.x,O.y,5,0,Math.PI*2);ctx.fill();
+  // label
+  ctx.fillStyle='#7a7f99';ctx.font='14px Segoe UI';
+  ctx.fillText('평행사변형의 대각선 = 합력',O.x+v1.x+v2.x+16,O.y+v1.y+v2.y+4);
+}
+
+// Slide 4: component decomposition
+function drawComp(){
+  const c=document.getElementById('c-comp');
+  if(!c)return;
+  const ctx=c.getContext('2d'),W=c.width,H=c.height;
+  ctx.clearRect(0,0,W,H);
+  const O={x:100,y:H-50};
+  const ang=38*Math.PI/180, F=180;
+  const fx=F*Math.cos(ang), fy=-F*Math.sin(ang);
+  function arr(x1,y1,x2,y2,col,lbl,dashed=false,w=2.5){
+    ctx.save();ctx.strokeStyle=col;ctx.lineWidth=w;
+    if(dashed)ctx.setLineDash([6,4]);
+    ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+    ctx.setLineDash([]);
+    const ang2=Math.atan2(y2-y1,x2-x1),hs=11;
+    ctx.fillStyle=col;ctx.beginPath();
+    ctx.moveTo(x2,y2);
+    ctx.lineTo(x2-hs*Math.cos(ang2-0.4),y2-hs*Math.sin(ang2-0.4));
+    ctx.lineTo(x2-hs*Math.cos(ang2+0.4),y2-hs*Math.sin(ang2+0.4));
+    ctx.closePath();ctx.fill();
+    if(lbl){ctx.fillStyle=col;ctx.font='bold 15px Segoe UI';ctx.fillText(lbl,(x1+x2)/2+6,(y1+y2)/2-8);}
+    ctx.restore();
+  }
+  ctx.strokeStyle='#1e2236';ctx.lineWidth=1;
+  for(let x=0;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for(let y=0;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  // axes
+  ctx.strokeStyle='#2e3148';ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(0,O.y);ctx.lineTo(W,O.y);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(O.x,0);ctx.lineTo(O.x,H);ctx.stroke();
+  ctx.fillStyle='#3a3f5c';ctx.font='13px Segoe UI';ctx.fillText('+x',W-22,O.y-6);ctx.fillText('+y',O.x+5,14);
+  // dashed components
+  arr(O.x,O.y,O.x+fx,O.y,'#f7834f',`Fx=${F*Math.cos(ang).toFixed(0)}N`,true);
+  arr(O.x+fx,O.y,O.x+fx,O.y+fy,'#f7834f','',true);
+  arr(O.x,O.y+fy,O.x+fx,O.y+fy,'#f7834f','',true,1.2);
+  arr(O.x,O.y,O.x,O.y+fy,'#4f8ef7',`Fy=${F*Math.sin(ang).toFixed(0)}N`,true);
+  // F
+  arr(O.x,O.y,O.x+fx,O.y+fy,'#4fca7a',`F=${F}N`,false,3);
+  // angle
+  ctx.strokeStyle='#f7d44f';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.arc(O.x,O.y,40,0,-ang,true);ctx.stroke();
+  ctx.fillStyle='#f7d44f';ctx.font='14px Segoe UI';ctx.fillText(`θ=38°`,O.x+44,O.y-8);
+}
+
+go(0);
+setTimeout(()=>{drawParal();drawComp();},100);
+</script>
+</body>
+</html>

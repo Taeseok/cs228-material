@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ch.04 — 모멘트와 우력</title>
+<link rel="stylesheet" href="../shared.css">
+<style>
+  .tab-bar{display:flex;gap:6px;margin-bottom:16px;}
+  .tab-bar button{background:var(--border);font-size:13px;padding:6px 14px;}
+  .tab-bar button.active{background:var(--accent);}
+  #moment-val{font-size:48px;font-weight:800;color:var(--yellow);text-align:center;margin:8px 0;}
+  .sign-pos{color:var(--green)!important;}
+  .sign-neg{color:var(--red)!important;}
+</style>
+</head>
+<body>
+<header>
+  <span class="chapter-tag">CH 04</span>
+  <h1>Force System Resultants — 모멘트와 우력</h1>
+</header>
+<div class="container">
+  <div class="tab-bar">
+    <button class="active" onclick="setTab('moment')">모멘트</button>
+    <button onclick="setTab('couple')">우력 (Couple)</button>
+    <button onclick="setTab('distributed')">분포 하중</button>
+  </div>
+
+  <div class="card">
+    <canvas id="c" width="860" height="380"></canvas>
+    <div id="moment-val">0 N·m</div>
+    <div class="controls">
+      <label>힘 F: <span id="fv">100</span> N</label>
+      <input type="range" id="fmag" min="10" max="200" value="100">
+
+      <label>방향 θ: <span id="fav">90</span>°</label>
+      <input type="range" id="fang" min="0" max="180" value="90">
+
+      <label>작용점 x: <span id="xv">300</span> mm</label>
+      <input type="range" id="xpos" min="50" max="750" value="300">
+    </div>
+    <div class="info-grid">
+      <div class="info-item"><div class="label">F</div><div class="value" id="if">—</div></div>
+      <div class="info-item"><div class="label">모멘트 팔 d</div><div class="value" id="id">—</div></div>
+      <div class="info-item"><div class="label">M = F × d</div><div class="value" id="im">—</div></div>
+      <div class="info-item"><div class="label">방향</div><div class="value" id="idir">—</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>핵심 공식</h2>
+    <div class="formula">M_O = F × d  (스칼라)   |   M_O = r × F  (벡터)</div>
+    <div class="formula">Varignon: M_O = Fx·y - Fy·x</div>
+    <p style="margin-top:12px">힘의 작용점과 방향을 바꿔 모멘트(회전력)가 어떻게 달라지는지 확인하세요. 반시계 방향이 (+), 시계 방향이 (−)입니다.</p>
+  </div>
+
+  <div class="nav-links card">
+    <a href="../../chapters/ch04-force-system-resultants/">← 개념 노트</a>
+    <a href="../../slides/ch04/">강의 슬라이드 →</a>
+  </div>
+</div>
+
+<script>
+const canvas=document.getElementById('c'),ctx=canvas.getContext('2d');
+const CW=canvas.width,CH=canvas.height;
+let currentTab='moment';
+
+function arrow(x1,y1,x2,y2,color,label,w=2.5,dashed=false){
+  const dx=x2-x1,dy=y2-y1,len=Math.sqrt(dx*dx+dy*dy);
+  if(len<2)return;
+  ctx.save();ctx.strokeStyle=color;ctx.lineWidth=w;
+  if(dashed)ctx.setLineDash([6,4]);
+  ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+  ctx.setLineDash([]);
+  const ang=Math.atan2(dy,dx),hs=12;
+  ctx.fillStyle=color;
+  ctx.beginPath();ctx.moveTo(x2,y2);
+  ctx.lineTo(x2-hs*Math.cos(ang-0.4),y2-hs*Math.sin(ang-0.4));
+  ctx.lineTo(x2-hs*Math.cos(ang+0.4),y2-hs*Math.sin(ang+0.4));
+  ctx.closePath();ctx.fill();
+  if(label){ctx.fillStyle=color;ctx.font='bold 13px Segoe UI';ctx.fillText(label,(x1+x2)/2+8,(y1+y2)/2-8);}
+  ctx.restore();
+}
+
+function arcArrow(cx,cy,r,startA,endA,color,cw,label){
+  ctx.save();ctx.strokeStyle=color;ctx.lineWidth=3;
+  ctx.beginPath();ctx.arc(cx,cy,r,startA,endA,!cw);ctx.stroke();
+  const ea=cw?endA+0.2:endA-0.2;
+  const tx=cx+r*Math.cos(endA),ty=cy+r*Math.sin(endA);
+  const hx=cx+r*Math.cos(ea),hy=cy+r*Math.sin(ea);
+  const hs=12;
+  const ang=Math.atan2(ty-hy,tx-hx);
+  ctx.fillStyle=color;ctx.beginPath();
+  ctx.moveTo(tx,ty);
+  ctx.lineTo(tx-hs*Math.cos(ang-0.4),ty-hs*Math.sin(ang-0.4));
+  ctx.lineTo(tx-hs*Math.cos(ang+0.4),ty-hs*Math.sin(ang+0.4));
+  ctx.closePath();ctx.fill();
+  if(label){ctx.fillStyle=color;ctx.font='bold 14px Segoe UI';ctx.fillText(label,cx-r-40,cy-r-10);}
+  ctx.restore();
+}
+
+function drawGrid(){
+  ctx.strokeStyle='#1e2236';ctx.lineWidth=1;
+  for(let x=0;x<CW;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,CH);ctx.stroke();}
+  for(let y=0;y<CH;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(CW,y);ctx.stroke();}
+}
+
+function drawMomentTab(){
+  const f=+document.getElementById('fmag').value;
+  const ang=+document.getElementById('fang').value*Math.PI/180;
+  const xp=+document.getElementById('xpos').value;
+  const Ox=80,Oy=CH/2; // pivot O
+  const FSCALE=1.2;
+
+  // beam
+  ctx.strokeStyle='#2e3148';ctx.lineWidth=6;
+  ctx.beginPath();ctx.moveTo(Ox,Oy);ctx.lineTo(CW-40,Oy);ctx.stroke();
+  // pivot
+  ctx.fillStyle='#f7834f';
+  ctx.beginPath();ctx.moveTo(Ox,Oy);ctx.lineTo(Ox-12,Oy+18);ctx.lineTo(Ox+12,Oy+18);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#e8eaf0';ctx.font='bold 14px Segoe UI';
+  ctx.fillText('O',Ox-6,Oy+34);
+
+  // force arrow at xp
+  const fx=f*Math.cos(ang)*FSCALE, fy=-f*Math.sin(ang)*FSCALE;
+  arrow(xp,Oy, xp+fx,Oy+fy,'#4f8ef7',`F=${f}N`,3);
+
+  // moment arm (perpendicular from O to force line)
+  // force line: through (xp,Oy), direction (cos ang, -sin ang)
+  // perpendicular foot from O(Ox,Oy):
+  const d=(xp-Ox)*Math.sin(ang); // signed perpendicular distance
+  const foot_x=xp-(xp-Ox)*Math.cos(ang)*Math.cos(ang);
+  const foot_y=Oy+(xp-Ox)*Math.cos(ang)*Math.sin(ang);
+  ctx.strokeStyle='#f7d44f';ctx.lineWidth=1.5;ctx.setLineDash([5,3]);
+  ctx.beginPath();ctx.moveTo(Ox,Oy);ctx.lineTo(foot_x,foot_y);ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle='#f7d44f';ctx.font='13px Segoe UI';
+  ctx.fillText(`d=${Math.abs(d).toFixed(0)} mm`,((Ox+foot_x)/2)+6,((Oy+foot_y)/2)-6);
+
+  // moment arc
+  const M=f*Math.abs(d)/1000; // N·m (假 mm)
+  const ccw=d>0;
+  arcArrow(Ox,Oy,50, ccw?Math.PI*1.2:Math.PI*0.3, ccw?Math.PI*0.3:Math.PI*1.2,
+    ccw?'#4fca7a':'#f74f4f', !ccw, `M=${M.toFixed(1)}N·m`);
+
+  // xp marker
+  ctx.fillStyle='#4f8ef7';ctx.beginPath();ctx.arc(xp,Oy,6,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='#7a7f99';ctx.font='12px Segoe UI';
+  ctx.fillText(`x=${xp-Ox}mm`,xp-16,Oy-16);
+
+  // update displays
+  const mv=document.getElementById('moment-val');
+  mv.textContent=(ccw?'+':'-')+M.toFixed(2)+' N·m';
+  mv.className=ccw?'sign-pos':'sign-neg';
+  document.getElementById('if').textContent=f+' N';
+  document.getElementById('id').textContent=Math.abs(d).toFixed(1)+' mm';
+  document.getElementById('im').textContent=M.toFixed(2)+' N·m';
+  document.getElementById('idir').textContent=ccw?'반시계 (+)':'시계 (−)';
+}
+
+function drawCoupleTab(){
+  const f=+document.getElementById('fmag').value;
+  const d=+document.getElementById('xpos').value/10; // px as spacing
+  const Cy=CH/2;
+  const x1=CW/2-d, x2=CW/2+d;
+  // two opposite forces
+  arrow(x1,Cy,x1,Cy-f*0.8,'#4f8ef7',`F=${f}N`,3);
+  arrow(x2,Cy,x2,Cy+f*0.8,'#f74f4f',`-F=${f}N`,3);
+  // couple moment arc
+  const M=f*(2*d/1000);
+  arcArrow(CW/2,Cy,d*0.7,-Math.PI,0,'#f7d44f',true,`M=${M.toFixed(1)}N·m`);
+  // dimension
+  ctx.strokeStyle='#7a7f99';ctx.lineWidth=1;ctx.setLineDash([3,3]);
+  ctx.beginPath();ctx.moveTo(x1,Cy+80);ctx.lineTo(x2,Cy+80);ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle='#7a7f99';ctx.font='12px Segoe UI';
+  ctx.fillText(`d = ${(2*d).toFixed(0)} mm`,(x1+x2)/2-30,Cy+100);
+  const mv=document.getElementById('moment-val');
+  mv.textContent=`M = ${M.toFixed(2)} N·m`;mv.className='sign-pos';
+  document.getElementById('if').textContent=f+' N';
+  document.getElementById('id').textContent=(2*d).toFixed(1)+' mm';
+  document.getElementById('im').textContent=M.toFixed(2)+' N·m';
+  document.getElementById('idir').textContent='자유 벡터 (Free Vector)';
+}
+
+function drawDistributed(){
+  const w0=+document.getElementById('fmag').value*0.5; // N/m max
+  const L=+document.getElementById('xpos').value*0.5; // mm → px
+  const x0=80,y0=CH*0.6;
+  const type=+document.getElementById('fang').value>90?'uniform':'triangle';
+  // draw beam
+  ctx.strokeStyle='#2e3148';ctx.lineWidth=6;
+  ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x0+L,y0);ctx.stroke();
+  // supports
+  [x0,x0+L].forEach(sx=>{
+    ctx.fillStyle='#f7834f';
+    ctx.beginPath();ctx.moveTo(sx,y0);ctx.lineTo(sx-10,y0+15);ctx.lineTo(sx+10,y0+15);ctx.closePath();ctx.fill();
+  });
+  // distributed load
+  const n=20;
+  for(let i=0;i<=n;i++){
+    const xi=x0+i*(L/n);
+    const h=type==='uniform'?w0:(w0*i/n);
+    arrow(xi,y0-h*0.6,xi,y0,'#4f8ef7','',1.5);
+  }
+  // outline
+  ctx.strokeStyle='#4f8ef7';ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(x0,y0-(type==='uniform'?w0*0.6:0));
+  if(type==='uniform'){ctx.lineTo(x0+L,y0-w0*0.6);}
+  else{ctx.lineTo(x0+L,y0-w0*0.6);}
+  ctx.stroke();
+  // resultant
+  const FR=type==='uniform'?w0*L*0.001:0.5*w0*L*0.001;
+  const xR=type==='uniform'?x0+L/2:x0+L*2/3;
+  arrow(xR,y0-80,xR,y0+30,'#4fca7a',`FR=${FR.toFixed(1)}N`,3);
+  ctx.fillStyle='#4fca7a';ctx.beginPath();ctx.arc(xR,y0,6,0,Math.PI*2);ctx.fill();
+  // labels
+  ctx.fillStyle='#7a7f99';ctx.font='12px Segoe UI';
+  ctx.fillText(type==='uniform'?`w=${w0.toFixed(0)} N/m`:`w₀=${w0.toFixed(0)} N/m`,x0,y0-w0*0.6-12);
+  const mv=document.getElementById('moment-val');
+  mv.textContent=`FR = ${FR.toFixed(2)} N`;mv.className='';
+  document.getElementById('if').textContent=`w₀=${w0.toFixed(0)} N/m`;
+  document.getElementById('id').textContent=`L=${L.toFixed(0)} px`;
+  document.getElementById('im').textContent=`FR=${FR.toFixed(2)} N`;
+  document.getElementById('idir').textContent=type==='uniform'?'중간점 (L/2)':'2/3 L (큰쪽에서)';
+}
+
+function draw(){
+  ctx.clearRect(0,0,CW,CH);drawGrid();
+  if(currentTab==='moment')drawMomentTab();
+  else if(currentTab==='couple')drawCoupleTab();
+  else drawDistributed();
+}
+
+function setTab(t){
+  currentTab=t;
+  document.querySelectorAll('.tab-bar button').forEach((b,i)=>b.classList.toggle('active',['moment','couple','distributed'][i]===t));
+  draw();
+}
+
+function updateLabels(){
+  document.getElementById('fv').textContent=document.getElementById('fmag').value;
+  document.getElementById('fav').textContent=document.getElementById('fang').value;
+  document.getElementById('xv').textContent=document.getElementById('xpos').value;
+}
+['fmag','fang','xpos'].forEach(id=>document.getElementById(id).addEventListener('input',()=>{updateLabels();draw();}));
+updateLabels();draw();
+</script>
+</body>
+</html>

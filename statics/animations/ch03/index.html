@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ch.03 — 자유물체도 & 질점 평형</title>
+<link rel="stylesheet" href="../shared.css">
+<style>
+  .scenario-bar { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+  .scenario-bar button { font-size:13px; padding:6px 13px; background:var(--border); }
+  .scenario-bar button.active { background:var(--accent); }
+  #status-badge {
+    display:inline-block; padding:6px 14px; border-radius:20px;
+    font-weight:700; font-size:14px; margin-left:auto;
+  }
+  .eq { background:#1a3a2a; color:var(--green); border-color: var(--green); }
+  .neq { background:#3a1a1a; color:var(--red); border-color: var(--red); }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="chapter-tag">CH 03</span>
+  <h1>Equilibrium of a Particle — 자유물체도 & 평형</h1>
+</header>
+
+<div class="container">
+
+  <div class="scenario-bar">
+    <button class="active" onclick="setScene(0)">① 케이블 + 중력</button>
+    <button onclick="setScene(1)">② 3-케이블 시스템</button>
+    <button onclick="setScene(2)">③ 스프링 시스템</button>
+    <span id="status-badge" class="eq">평형 ✓</span>
+  </div>
+
+  <div class="card">
+    <canvas id="c" width="860" height="380"></canvas>
+    <div class="controls">
+      <label>중량 W: <span id="wv">100</span> N</label>
+      <input type="range" id="wmag" min="20" max="200" value="100">
+
+      <label id="lbl-a">θ₁ (왼쪽): <span id="a1v">40</span>°</label>
+      <input type="range" id="ang1" min="5" max="85" value="40">
+
+      <label id="lbl-b">θ₂ (오른쪽): <span id="a2v">55</span>°</label>
+      <input type="range" id="ang2" min="5" max="85" value="55">
+    </div>
+
+    <div class="info-grid">
+      <div class="info-item"><div class="label">W (중력)</div><div class="value" id="iw">—</div></div>
+      <div class="info-item"><div class="label">T₁ (왼쪽)</div><div class="value" id="it1">—</div></div>
+      <div class="info-item"><div class="label">T₂ (오른쪽)</div><div class="value" id="it2">—</div></div>
+      <div class="info-item"><div class="label">ΣFx</div><div class="value" id="sfx">—</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>핵심 개념</h2>
+    <div class="formula">ΣFx = 0 : -T₁cos θ₁ + T₂cos θ₂ = 0</div>
+    <div class="formula">ΣFy = 0 :  T₁sin θ₁ + T₂sin θ₂ - W = 0</div>
+    <p style="margin-top:12px">
+      점 (질점) 에 작용하는 모든 힘의 합이 0이면 평형. 슬라이더로 하중과 각도를 바꾸면
+      장력이 실시간 갱신됩니다. 장력이 음수가 되는 영역 (불가능 상태) 에서는 빨간 경고가 표시됩니다.
+    </p>
+  </div>
+
+  <div class="nav-links card">
+    <a href="../../chapters/ch03-equilibrium-particle/">← 개념 노트</a>
+    <a href="../../slides/ch03/">강의 슬라이드 →</a>
+  </div>
+</div>
+
+<script>
+const canvas=document.getElementById('c'), ctx=canvas.getContext('2d');
+const W=canvas.width, H=canvas.height;
+let scene=0;
+
+function arrow(x1,y1,x2,y2,color,label,w=2.5){
+  const dx=x2-x1,dy=y2-y1,len=Math.sqrt(dx*dx+dy*dy);
+  if(len<2) return;
+  ctx.save();
+  ctx.strokeStyle=color; ctx.lineWidth=w;
+  ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+  const ang=Math.atan2(dy,dx),hs=12;
+  ctx.fillStyle=color;
+  ctx.beginPath();
+  ctx.moveTo(x2,y2);
+  ctx.lineTo(x2-hs*Math.cos(ang-0.4),y2-hs*Math.sin(ang-0.4));
+  ctx.lineTo(x2-hs*Math.cos(ang+0.4),y2-hs*Math.sin(ang+0.4));
+  ctx.closePath();ctx.fill();
+  if(label){
+    ctx.fillStyle=color;ctx.font='bold 14px Segoe UI';
+    ctx.fillText(label,(x1+x2)/2+8,(y1+y2)/2-8);
+  }
+  ctx.restore();
+}
+
+function drawWall(x,y,w2,h2){
+  ctx.fillStyle='#2a2e44';
+  ctx.fillRect(x,y,w2,h2);
+  ctx.strokeStyle='#3a3f5c';ctx.lineWidth=1;
+  for(let i=0;i<8;i++){
+    ctx.beginPath();
+    if(h2>w2){ ctx.moveTo(x,y+i*h2/7);ctx.lineTo(x-10,y+i*h2/7+10); }
+    else { ctx.moveTo(x+i*w2/7,y);ctx.lineTo(x+i*w2/7+10,y-10); }
+    ctx.stroke();
+  }
+}
+
+function drawScene0(){
+  const wmag=+document.getElementById('wmag').value;
+  const a1=+document.getElementById('ang1').value*Math.PI/180;
+  const a2=+document.getElementById('ang2').value*Math.PI/180;
+  const Px=W/2, Py=H/2-20;
+
+  // solve T1, T2
+  // T1*cos(a1) = T2*cos(a2)  → T1 = T2*cos(a2)/cos(a1)
+  // T1*sin(a1)+T2*sin(a2) = W
+  const denom = Math.sin(a1)*Math.cos(a2)+Math.cos(a1)*Math.sin(a2);
+  const T2 = wmag*Math.cos(a1)/denom;
+  const T1 = T2*Math.cos(a2)/Math.cos(a1);
+  const valid = T1>0 && T2>0;
+
+  // walls
+  drawWall(0,0,16,H); drawWall(W-16,0,16,H);
+  // ceiling anchor points
+  const ax1=80, ay1=30, ax2=W-80, ay2=30;
+  ctx.fillStyle='#4f8ef7';
+  ctx.beginPath();ctx.arc(ax1,ay1,6,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(ax2,ay2,6,0,Math.PI*2);ctx.fill();
+
+  const SCALE=1.6;
+  const t1len=T1*SCALE, t2len=T2*SCALE;
+  const t1x=-Math.cos(a1)*t1len, t1y=-Math.sin(a1)*t1len;
+  const t2x= Math.cos(a2)*t2len, t2y=-Math.sin(a2)*t2len;
+
+  const c1=valid?'#4f8ef7':'#f74f4f';
+  const c2=valid?'#f7834f':'#f74f4f';
+
+  // cables
+  ctx.strokeStyle=valid?'#2e3148':'#5a1a1a';ctx.lineWidth=2;
+  ctx.setLineDash([]);
+  ctx.beginPath();ctx.moveTo(ax1,ay1);ctx.lineTo(Px,Py);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(ax2,ay2);ctx.lineTo(Px,Py);ctx.stroke();
+
+  // FBD at particle
+  arrow(Px,Py, Px+t1x, Py+t1y, c1, `T₁=${T1.toFixed(1)}N`);
+  arrow(Px,Py, Px+t2x, Py+t2y, c2, `T₂=${T2.toFixed(1)}N`);
+  arrow(Px,Py, Px, Py+wmag*SCALE*0.6, '#4fca7a', `W=${wmag}N`, 3);
+
+  // particle
+  ctx.fillStyle=valid?'#4fca7a':'#f74f4f';
+  ctx.beginPath();ctx.arc(Px,Py,10,0,Math.PI*2);ctx.fill();
+
+  // angle labels
+  ctx.fillStyle='#e8eaf0';ctx.font='13px Segoe UI';
+  ctx.fillText(`θ₁=${document.getElementById('ang1').value}°`, Px-80,Py-20);
+  ctx.fillText(`θ₂=${document.getElementById('ang2').value}°`, Px+40,Py-20);
+
+  // update info
+  document.getElementById('iw').textContent=wmag+' N';
+  document.getElementById('it1').textContent=T1.toFixed(1)+' N'+(T1<0?' ⚠️':'');
+  document.getElementById('it2').textContent=T2.toFixed(1)+' N'+(T2<0?' ⚠️':'');
+  const sfx=(-T1*Math.cos(a1)+T2*Math.cos(a2));
+  document.getElementById('sfx').textContent=sfx.toFixed(2)+' N';
+  const badge=document.getElementById('status-badge');
+  badge.textContent=valid?'평형 ✓':'불가능 ✗';
+  badge.className=valid?'eq':'neq';
+}
+
+function drawScene1(){
+  // 3-cable concurrent at one point
+  const wmag=+document.getElementById('wmag').value;
+  const Px=W/2, Py=H/2;
+  const angles=[150,30,270]; // degrees from +x axis
+  const colors=['#4f8ef7','#f7834f','#4fca7a'];
+  const labels=['T₁','T₂','W'];
+  // simplified: equal T1=T2, W computed
+  const a1=+document.getElementById('ang1').value*Math.PI/180;
+  const a2=(180-+document.getElementById('ang2').value)*Math.PI/180;
+  const denom2=Math.sin(a1)*Math.cos(a2)+Math.cos(a1)*Math.sin(a2);
+  const T2=wmag*Math.cos(a1)/denom2;
+  const T1=T2*Math.cos(a2)/Math.cos(a1);
+
+  // draw
+  ctx.strokeStyle='#2e3148';ctx.lineWidth=1;
+  // grid reference
+  ctx.beginPath();ctx.moveTo(0,Py);ctx.lineTo(W,Py);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(Px,0);ctx.lineTo(Px,H);ctx.stroke();
+
+  const SCALE=1.5;
+  [[a1,T1,'#4f8ef7','T₁'],[Math.PI-a2,T2,'#f7834f','T₂'],[Math.PI*3/2,wmag,'#4fca7a','W']].forEach(([ang,mag,col,lbl])=>{
+    const ex=Px+Math.cos(ang)*mag*SCALE, ey=Py-Math.sin(ang)*mag*SCALE;
+    arrow(Px,Py,ex,ey,col,`${lbl}=${mag.toFixed(0)}N`,3);
+  });
+  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(Px,Py,10,0,Math.PI*2);ctx.fill();
+
+  document.getElementById('iw').textContent=wmag+' N';
+  document.getElementById('it1').textContent=T1.toFixed(1)+' N';
+  document.getElementById('it2').textContent=T2.toFixed(1)+' N';
+  document.getElementById('sfx').textContent='0.0 N (평형)';
+  document.getElementById('status-badge').textContent='평형 ✓';
+  document.getElementById('status-badge').className='eq';
+}
+
+function drawScene2(){
+  // spring-and-weight system
+  const wmag=+document.getElementById('wmag').value;
+  const k=50; // N/m
+  const s=wmag/k;
+  const Px=W/2, Py0=80;
+  // wall
+  drawWall(Px-80, Py0-20, 160, 16);
+  // spring zigzag
+  const springH=Math.min(s*30+80,200);
+  ctx.strokeStyle='#f7d44f';ctx.lineWidth=2;
+  ctx.beginPath();
+  const n=12, seg=springH/n;
+  ctx.moveTo(Px,Py0);
+  for(let i=0;i<n;i++){
+    const yy=Py0+seg*(i+0.5);
+    ctx.lineTo(Px+(i%2===0?20:-20),yy);
+  }
+  ctx.lineTo(Px,Py0+springH);ctx.stroke();
+  // weight box
+  ctx.fillStyle='#4f8ef7';
+  const bx=Px-30, by=Py0+springH;
+  ctx.fillRect(bx,by,60,40);
+  ctx.fillStyle='#fff';ctx.font='bold 14px Segoe UI';ctx.textAlign='center';
+  ctx.fillText(wmag+'N',Px,by+26);ctx.textAlign='left';
+  // spring force arrow (up)
+  arrow(Px,by, Px,by-60,'#f7d44f',`Fs=${wmag}N`);
+  // weight arrow (down)
+  arrow(Px,by+40, Px,by+110,'#4fca7a',`W=${wmag}N`);
+  // label stretch
+  ctx.fillStyle='#7a7f99';ctx.font='13px Segoe UI';
+  ctx.fillText(`k=${k} N/m  |  늘어남 s=${s.toFixed(2)} m`, Px+80,Py0+springH/2);
+
+  document.getElementById('iw').textContent=wmag+' N';
+  document.getElementById('it1').textContent=`k=${k} N/m`;
+  document.getElementById('it2').textContent=`s=${s.toFixed(3)} m`;
+  document.getElementById('sfx').textContent='0.0 N (평형)';
+  document.getElementById('status-badge').textContent='평형 ✓';
+  document.getElementById('status-badge').className='eq';
+}
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+  // grid
+  ctx.strokeStyle='#1e2236';ctx.lineWidth=1;
+  for(let x=0;x<W;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+  for(let y=0;y<H;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+  if(scene===0) drawScene0();
+  else if(scene===1) drawScene1();
+  else drawScene2();
+}
+
+function setScene(n){
+  scene=n;
+  document.querySelectorAll('.scenario-bar button').forEach((b,i)=>b.classList.toggle('active',i===n));
+  draw();
+}
+
+function updateLabels(){
+  document.getElementById('wv').textContent=document.getElementById('wmag').value;
+  document.getElementById('a1v').textContent=document.getElementById('ang1').value;
+  document.getElementById('a2v').textContent=document.getElementById('ang2').value;
+}
+
+['wmag','ang1','ang2'].forEach(id=>document.getElementById(id).addEventListener('input',()=>{updateLabels();draw();}));
+updateLabels();draw();
+</script>
+</body>
+</html>

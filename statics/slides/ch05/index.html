@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ch.05 Equilibrium of a Rigid Body — 강의 슬라이드</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{width:100%;height:100%;background:#0c0e18;font-family:'Segoe UI',system-ui,sans-serif;overflow:hidden;}
+.deck{width:100vw;height:100vh;position:relative;}
+.slide{position:absolute;inset:0;display:flex;flex-direction:column;padding:60px 80px;opacity:0;pointer-events:none;transition:opacity .4s,transform .4s;transform:translateX(60px);}
+.slide.active{opacity:1;pointer-events:all;transform:translateX(0);}
+.slide.prev{opacity:0;transform:translateX(-60px);}
+.slide-title{background:linear-gradient(135deg,#0f1117 0%,#1a1f35 100%);justify-content:center;align-items:center;text-align:center;}
+.slide-content{background:#0f1117;}
+.chapter-badge{background:#f74f4f;color:#fff;font-size:13px;font-weight:700;padding:4px 12px;border-radius:20px;letter-spacing:.6px;margin-bottom:20px;display:inline-block;}
+h1{font-size:52px;font-weight:800;line-height:1.1;color:#fff;margin-bottom:16px;}
+h1 span{color:#f74f4f;}
+.subtitle{font-size:20px;color:#7a7f99;}
+h2{font-size:28px;font-weight:700;color:#fff;margin-bottom:24px;padding-bottom:12px;border-bottom:2px solid #2e3148;}
+h3{font-size:20px;font-weight:600;color:#f74f4f;margin:20px 0 10px;}
+p,li{font-size:17px;color:#b0b5cc;line-height:1.7;}
+ul{padding-left:20px;}li{margin-bottom:8px;}strong{color:#e8eaf0;}
+.formula-box{background:#13161f;border-left:4px solid #f74f4f;border-radius:0 10px 10px 0;padding:16px 20px;margin:14px 0;font-family:'Courier New',monospace;font-size:16px;color:#f7d44f;}
+.highlight-box{background:#1a1f35;border:1px solid #2e3148;border-radius:10px;padding:16px 20px;margin:14px 0;}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:12px;}
+.col{background:#13161f;border-radius:10px;padding:16px 18px;}
+.col h4{font-size:14px;color:#f74f4f;font-weight:700;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px;}
+table{width:100%;border-collapse:collapse;margin-top:12px;}
+th{background:#1a1f35;color:#7a7f99;font-size:13px;padding:10px 12px;text-align:left;font-weight:600;}
+td{padding:10px 12px;font-size:15px;color:#b0b5cc;border-bottom:1px solid #1e2236;}
+.nav{position:fixed;bottom:24px;right:32px;display:flex;gap:10px;align-items:center;z-index:100;}
+.nav button{background:#2e3148;border:none;color:#e8eaf0;width:44px;height:44px;border-radius:50%;font-size:18px;cursor:pointer;transition:background .15s;display:flex;align-items:center;justify-content:center;}
+.nav button:hover{background:#f74f4f;}
+.slide-counter{color:#7a7f99;font-size:13px;min-width:50px;text-align:center;}
+.progress{position:fixed;bottom:0;left:0;height:3px;background:#f74f4f;transition:width .3s;z-index:100;}
+.slide-num{position:fixed;top:20px;right:28px;color:#3a3f5c;font-size:13px;z-index:100;}
+</style>
+</head>
+<body>
+<div class="deck" id="deck">
+
+<div class="slide slide-title active" data-idx="0">
+  <div class="chapter-badge">CHAPTER 05</div>
+  <h1><span>Equilibrium of a Rigid Body</span></h1>
+  <p class="subtitle">강체의 평형</p>
+  <p style="margin-top:40px;font-size:14px;color:#3a3f5c;">Engineering Mechanics: Statics — Hibbeler 14e</p>
+</div>
+
+<div class="slide slide-content" data-idx="1">
+  <h2>학습 목표</h2>
+  <ul>
+    <li>이 챕터의 핵심 개념과 공식을 이해한다</li>
+    <li>자유물체도(FBD)를 올바르게 작성한다</li>
+    <li>평형 방정식을 체계적으로 세우고 풀 수 있다</li>
+    <li>예제 문제를 통해 풀이 절차를 익힌다</li>
+  </ul>
+  <div class="highlight-box" style="margin-top:24px;">
+    <p>👉 이 슬라이드를 보기 전에 <a href="../../chapters/ch05-*/README.md" style="color:#f74f4f;">개념 노트</a>를 먼저 읽어두세요.</p>
+  </div>
+</div>
+
+<div class="slide slide-content" data-idx="2">
+  <h2>핵심 개념</h2>
+  <p style="color:#7a7f99;margin-bottom:20px;">아래 개념들을 이 챕터에서 학습합니다.</p>
+  <div class="two-col">
+    <div class="col">
+      <h4>이론</h4>
+      <ul>
+        <li>기본 원리 및 정의</li>
+        <li>핵심 공식 유도</li>
+        <li>적용 조건 파악</li>
+      </ul>
+    </div>
+    <div class="col">
+      <h4>풀이 절차</h4>
+      <ul>
+        <li>FBD 작성</li>
+        <li>방정식 수립</li>
+        <li>미지수 풀기</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="slide slide-content" data-idx="3">
+  <h2>주요 공식</h2>
+  <div class="formula-box">// PDF 업로드 후 이 챕터의 공식을 여기에 추가하세요</div>
+  <div class="highlight-box" style="margin-top:16px;">
+    <p>📌 공식을 외우기보다 <strong>유도 과정</strong>과 <strong>적용 조건</strong>을 이해하는 것이 중요합니다.</p>
+  </div>
+</div>
+
+<div class="slide slide-content" data-idx="4">
+  <h2>예제 문제</h2>
+  <div class="highlight-box">
+    <p>문제: (PDF 업로드 후 예제 추가)</p>
+  </div>
+  <h3 style="margin-top:24px;">풀이 절차</h3>
+  <ol style="padding-left:20px;color:#b0b5cc;font-size:16px;">
+    <li style="margin-bottom:10px;">주어진 조건 정리 및 FBD 작성</li>
+    <li style="margin-bottom:10px;">평형 방정식(또는 해당 방정식) 수립</li>
+    <li style="margin-bottom:10px;">미지수 계산</li>
+    <li>답의 타당성 확인</li>
+  </ol>
+</div>
+
+<div class="slide slide-content" data-idx="5">
+  <h2>요약 & 다음 챕터</h2>
+  <table>
+    <tr><th>핵심 개념</th><th>공식</th></tr>
+    <tr><td>개념 1</td><td>— (추가 예정)</td></tr>
+    <tr><td>개념 2</td><td>— (추가 예정)</td></tr>
+  </table>
+  <div class="highlight-box" style="margin-top:24px;">
+    <p>🎯 <a href="../../animations/ch05/" style="color:#f74f4f;">인터랙티브 애니메이션</a>으로 개념을 시각적으로 확인하세요.</p>
+    <p style="margin-top:8px;">📝 <a href="../../problems/ch05/" style="color:#f74f4f;">예제 문제 풀이</a>로 실력을 다지세요.</p>
+  </div>
+</div>
+
+</div>
+<div class="slide-num" id="snum">1 / 6</div>
+<div class="progress" id="prog"></div>
+<div class="nav">
+  <button onclick="go(-1)">←</button>
+  <span class="slide-counter" id="cnt">1 / 6</span>
+  <button onclick="go(1)">→</button>
+</div>
+<script>
+const slides=[...document.querySelectorAll('.slide')];
+let cur=0,total=slides.length;
+function go(d){
+  slides[cur].className='slide'+(cur>0?' prev':'');
+  cur=Math.max(0,Math.min(total-1,cur+d));
+  slides[cur].className='slide active';
+  document.getElementById('cnt').textContent=(cur+1)+'/'+total;
+  document.getElementById('snum').textContent=(cur+1)+'/'+total;
+  document.getElementById('prog').style.width=((cur+1)/total*100)+'%';
+}
+document.addEventListener('keydown',e=>{if(e.key==='ArrowRight'||e.key===' ')go(1);if(e.key==='ArrowLeft')go(-1);});
+go(0);
+</script>
+</body>
+</html>
